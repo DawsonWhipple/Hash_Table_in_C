@@ -58,4 +58,15 @@ void ht_delete_hash_table(ht_hash_table* ht){
     free(ht->items);
     free(ht);
 }
-
+//takes a string as input, returns a number between 0 and m (desired bucket length)
+//The variable a should be a prime number larger than the size of the alphabet.
+//We're hashing ASCII strings, which has an alphabet size of 128, so we should choose a prime larger than that.
+static int ht_hash(const char* s, const int a, const int m){
+    long hash = 0;
+    const int len_s = strlen(s);
+    for(int i = 0; i < len_s; i++){
+        hash += (long)pow(a, len_s - (i+1)) * s[i]; //generic hashing algorithm
+        hash = hash % m;
+    }
+    return (int) hash;
+}
