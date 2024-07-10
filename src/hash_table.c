@@ -21,6 +21,7 @@
 
 #define HT_PRIME_1 2423
 #define HT_PRIME_2 2287
+#define HT_INITIAL_BASE_SIZE 53
 
 static ht_item HT_DELETED_ITEM = {NULL, NULL};
 
@@ -32,11 +33,14 @@ static ht_item* ht_new_item(const char* k, const char* v){
     return i;
 }
 
-ht_hash_table* ht_new(){
-    ht_hash_table *ht = malloc(sizeof(ht_hash_table));
-    ht->size = 53; //default size
-    ht->count = 0; //ht starts out empty
-    ht->items = calloc((size_t)ht->size, sizeof(ht_item*)); //dynamic allocaiton
+static ht_hash_table* ht_new_sized(const int base_size) {
+    ht_hash_table* ht = xmalloc(sizeof(ht_hash_table));
+    ht->base_size = base_size;
+
+    ht->size = next_prime(ht->base_size);
+
+    ht->count = 0;
+    ht->items = xcalloc((size_t)ht->size, sizeof(ht_item*));
     /*
     The stdlib.h and stddef.h header files define a datatype called size_t which is used to represent the size of an object. 
     Library functions that take sizes expect them to be of type size_t, and the sizeof operator evaluates to size_t.
@@ -44,7 +48,12 @@ ht_hash_table* ht_new(){
     The actual type of size_t is platform-dependent; a common mistake is to assume size_t is the same as unsigned int, 
     which can lead to programming errors, particularly as 64-bit architectures become more prevalent.
     */
-   return ht;
+    return ht;
+}
+
+
+ht_hash_table* ht_new() {
+    return ht_new_sized(HT_INITIAL_BASE_SIZE);
 }
 
 //delete an item from memory and therefore from the hashtable
@@ -89,6 +98,10 @@ static int ht_get_hash(const char* s, const int num_buckets, const int attempt){
 //To insert a new key-value pair, we iterate through indexes until we find an empty bucket. 
 //We then insert the item into that bucket and increment the hash table's count attribute, to indicate a new item has been added.
 void ht_insert(ht_hash_table* ht, const char* key, const char* value){
+    const int load = ht->count * 100 / ht->size;
+    if (load > 70) {
+        ht_resize_up(ht);
+    }
     ht_item* item = ht_new_item(key, value); //create a blank new item
     int index = ht_get_hash(item->key, ht->size, 0); //create a starting index hash 
     ht_item* cur_item = ht->items[index]; //establish the starting item from the starting index
@@ -132,6 +145,10 @@ char* ht_search(ht_hash_table* ht, const char* key){
 //The item we wish to delete may be part of a collision chain. Removing it from the table will break that chain, and will make finding items in the tail of the chain impossible. To solve this, instead of deleting the item, we simply mark it as deleted.
 //We mark an item as deleted by replacing it with a pointer to a global sentinel item which represents that a bucket contains a deleted item.
 void ht_delete(ht_hash_table* ht, const char* key){
+    const int load = ht->count * 100 / ht->size;
+    if (load < 10) {
+        ht_resize_down(ht);
+    }
     int index = ht_get_hash(key, ht->size, 0);
     ht_item* item = ht->items[index];
     int i = 1;
@@ -147,4 +164,42 @@ void ht_delete(ht_hash_table* ht, const char* key){
         i++;
     } 
     ht->count--; 
+}
+
+static void ht_resize(ht_hash_table* ht, const int base_size) {
+    if (base_size < HT_INITIAL_BASE_SIZE) {
+        return;
+    }
+    ht_hash_table* new_ht = ht_new_sized(base_size);
+    for (int i = 0; i < ht->size; i++) {
+        ht_item* item = ht->items[i];
+        if (item != NULL && item != &HT_DELETED_ITEM) {
+            ht_insert(new_ht, item->key, item->value);
+        }
+    }
+
+    ht->base_size = new_ht->base_size;
+    ht->count = new_ht->count;
+
+    // To delete new_ht, we give it ht's size and items 
+    const int tmp_size = ht->size;
+    ht->size = new_ht->size;
+    new_ht->size = tmp_size;
+
+    ht_item** tmp_items = ht->items;
+    ht->items = new_ht->items;
+    new_ht->items = tmp_items;
+
+    ht_del_hash_table(new_ht);
+}   
+
+static void ht_resize_up(ht_hash_table* ht) {
+    const int new_size = ht->base_size * 2;
+    ht_resize(ht, new_size);
+}
+
+
+static void ht_resize_down(ht_hash_table* ht) {
+    const int new_size = ht->base_size / 2;
+    ht_resize(ht, new_size);
 }

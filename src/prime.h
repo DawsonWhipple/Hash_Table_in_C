@@ -14,3 +14,5 @@
 //Associative array: an abstract data structure which implements the API described above. Also called a map, symbol table or dictionary.
 //Hash table: a fast implementation of the associative array API which makes use of a hash function. Also called a hash map, map, hash or dictionary.
 
+int is_prime(const int x);
+int next_prime(int x);

@@ -22,6 +22,7 @@ typedef struct {
 
 //hash table stores: an array of pointers to items, details about size and how full it is
 typedef struct {
+    int base_size;
     int size;
     int count;
     ht_item** items;
